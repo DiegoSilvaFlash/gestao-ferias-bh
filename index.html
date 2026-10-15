@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* Layout: painel operacional — cabeçalho com filtros, faixa de indicadores, ocupação mensal, linha do tempo anual (Gantt) e lista de períodos */
 :root{
@@ -178,6 +179,14 @@ tr:hover td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .msg.warn{background:var(--warn-soft);color:var(--fg);border-left:3px solid var(--warn)}
 .msg.err{background:var(--bad-soft);color:var(--fg);border-left:3px solid var(--bad)}
 .check{display:flex;gap:8px;align-items:center;font-size:13px}
+.modal.wide{max-width:780px}
+.base-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.preview{border:1px solid var(--line-soft);border-radius:8px;max-height:300px;overflow:auto}
+.preview table{min-width:520px;font-size:12.5px}
+.preview th,.preview td{padding:6px 10px}
+.hint-line{font-size:12px;min-height:16px;color:var(--muted)}
+.hint-line.ok{color:var(--ok)} .hint-line.warn{color:var(--warn)}
 .abono{border:1px solid var(--line);border-radius:8px;padding:10px 12px 12px;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
 .abono legend{font-size:12px;color:var(--muted);font-weight:500;padding:0 4px}
 .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
@@ -339,6 +348,7 @@ class Zn{constructor(e,r){this.cacheOutcome=he,this.cacheManager=r,this.apiId=e.
       <span class="conn"><span class="conn-dot" id="connDot"></span><span id="connText">Conectando…</span></span>
       <span class="user-badge"><span id="userName"></span><button class="btn ghost" type="button" id="btnLogout">Sair</button></span>
       <button class="btn" type="button" id="btnRefresh" title="Atualizar dados">⟳ Atualizar</button>
+      <button class="btn" id="btnBase" type="button">Base de colaboradores</button>
       <button class="btn" id="btnExport" type="button">Exportar CSV (Excel)</button>
       <button class="btn primary" id="btnAdd" type="button">+ Lançar férias</button>
     </div>
@@ -354,7 +364,7 @@ class Zn{constructor(e,r){this.cacheOutcome=he,this.cacheManager=r,this.apiId=e.
   <div class="filters">
     <div class="seg" role="group" aria-label="Período exibido" id="yearSeg"></div>
     <input type="search" id="q" placeholder="Buscar colaborador…" aria-label="Buscar colaborador">
-    <select id="fSetor" aria-label="Filtrar por setor"><option value="">Todos os setores</option></select>
+    <select id="fSetor" aria-label="Filtrar por setor"><option value="">Todas as áreas</option></select>
     <select id="fStatus" aria-label="Filtrar por status">
       <option value="">Todos os status</option>
       <option>Programada</option><option>Aprovada</option><option>Em gozo</option><option>Concluída</option>
@@ -424,10 +434,10 @@ class Zn{constructor(e,r){this.cacheOutcome=he,this.cacheManager=r,this.apiId=e.
       <button class="btn ghost" type="button" id="mClose" aria-label="Fechar">✕</button>
     </header>
     <form id="form" novalidate>
-      <div class="field full"><label for="fNome">Colaborador *</label><input type="text" id="fNome" list="dlNomes" autocomplete="off" required></div>
+      <div class="field full"><label for="fNome">Colaborador *</label><input type="text" id="fNome" list="dlNomes" autocomplete="off" required><div class="hint-line" id="fBaseHint"></div></div>
       <div class="field"><label for="fMatricula">Matrícula</label><input type="text" id="fMatricula" autocomplete="off"></div>
       <div class="field"><label for="fCargo">Cargo *</label><input type="text" id="fCargo" list="dlCargos" autocomplete="off" required></div>
-      <div class="field full"><label for="fSetorIn">Setor / Unidade</label><input type="text" id="fSetorIn" list="dlSetores" autocomplete="off"></div>
+      <div class="field full"><label for="fSetorIn">Área / Setor</label><input type="text" id="fSetorIn" list="dlSetores" autocomplete="off"></div>
       <div class="field"><label for="fIni">Início *</label><input type="date" id="fIni" required></div>
       <div class="field"><label for="fFim">Fim *</label><input type="date" id="fFim" required></div>
       <div class="quick full"><span class="flt-label">Duração rápida:</span>
@@ -455,9 +465,9 @@ class Zn{constructor(e,r){this.cacheOutcome=he,this.cacheManager=r,this.apiId=e.
       <button class="btn ghost" type="button" id="bClose" aria-label="Fechar">✕</button>
     </header>
     <form id="formBH" novalidate>
-      <div class="field full"><label for="bNome">Colaborador *</label><input type="text" id="bNome" list="dlNomes" autocomplete="off"></div>
+      <div class="field full"><label for="bNome">Colaborador *</label><input type="text" id="bNome" list="dlNomes" autocomplete="off"><div class="hint-line" id="bBaseHint"></div></div>
       <div class="field"><label for="bCargo">Cargo *</label><input type="text" id="bCargo" list="dlCargos" autocomplete="off"></div>
-      <div class="field"><label for="bSetor">Setor / Unidade</label><input type="text" id="bSetor" list="dlSetores" autocomplete="off"></div>
+      <div class="field"><label for="bSetor">Área / Setor</label><input type="text" id="bSetor" list="dlSetores" autocomplete="off"></div>
       <fieldset class="abono full"><legend>Tipo de lançamento</legend><div class="opts" id="bTipos"></div></fieldset>
       <div class="field"><label for="bData">Data *</label><input type="date" id="bData"></div>
       <div class="field"><label for="bHoras">Horas * (hh:mm)</label><input type="text" id="bHoras" inputmode="decimal" placeholder="ex.: 1:30" autocomplete="off"></div>
@@ -474,6 +484,13 @@ class Zn{constructor(e,r){this.cacheOutcome=he,this.cacheManager=r,this.apiId=e.
     </footer>
   </div>
 </div>
+<div class="overlay" id="overlayBase" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="baseTitle">
+    <header><h2 id="baseTitle">Base de colaboradores</h2><button class="btn ghost" type="button" data-close="base" aria-label="Fechar">✕</button></header>
+    <div class="base-body" id="baseBody"></div>
+  </div>
+</div>
+<input type="file" id="baseFile" accept=".xlsx,.xls,.csv" hidden>
 <datalist id="dlNomes"></datalist><datalist id="dlCargos"></datalist><datalist id="dlSetores"></datalist>
 <div class="toast" id="toast" hidden></div>
 
@@ -572,10 +589,12 @@ function renderFilterOptions(){
   const counts={};for(const r of src){const k=norm(r.cargo);counts[k]=counts[k]||new Set();counts[k].add(norm(r.nome))}
   $('cargoChips').innerHTML=cargos.length?`<span class="flt-label">Cargos:</span>`+cargos.map(c=>`<button type="button" class="chip" data-cargo="${esc(c)}" aria-pressed="${!off.has(norm(c))}" style="--c:${cvar(c)}"><span class="dot"></span>${esc(c)} <span class="ct">${counts[norm(c)].size}</span></button>`).join(''):'';
   const setores=uniq(src.map(r=>r.setor)), sel=$('fSetor'), cur=sel.value;
-  sel.innerHTML='<option value="">Todos os setores</option>'+setores.map(s=>`<option${s===cur?' selected':''}>${esc(s)}</option>`).join('');
-  $('dlNomes').innerHTML=uniq(both.map(r=>r.nome)).map(n=>`<option value="${esc(n)}">`).join('');
-  $('dlCargos').innerHTML=uniq([...both.map(r=>r.cargo),...Object.keys(cargoMap)]).map(n=>`<option value="${esc(n)}">`).join('');
-  $('dlSetores').innerHTML=uniq(both.map(r=>r.setor)).map(n=>`<option value="${esc(n)}">`).join('');
+  sel.innerHTML='<option value="">Todas as áreas</option>'+setores.map(s=>`<option${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+  const bm=new Map(base.map(b=>[norm(b.nome),b]));
+  $('dlNomes').innerHTML=uniq([...base.map(b=>b.nome),...both.map(r=>r.nome)]).map(n=>{const b=bm.get(norm(n));return`<option value="${esc(n)}"${b?` label="${esc([b.matricula&&'Mat. '+b.matricula,b.cargo,b.area].filter(Boolean).join(' · '))}"`:''}>`}).join('');
+  $('btnBase').textContent=base.length?`Base de colaboradores (${nf(base.length)})`:'Base de colaboradores';
+  $('dlCargos').innerHTML=uniq([...both.map(r=>r.cargo),...base.map(b=>b.cargo),...Object.keys(cargoMap)]).map(n=>`<option value="${esc(n)}">`).join('');
+  $('dlSetores').innerHTML=uniq([...both.map(r=>r.setor),...base.map(b=>b.area)]).map(n=>`<option value="${esc(n)}">`).join('');
 }
 
 function peopleByMonth(list,rg){
@@ -681,7 +700,7 @@ function openForm(id){
   $('fNome').value=r?.nome||'';$('fMatricula').value=r?.matricula||'';$('fCargo').value=r?.cargo||'';$('fSetorIn').value=r?.setor||'';
   $('fIni').value=r?.inicio||'';$('fFim').value=r?.fim||'';$('fStatusIn').value=r?.status==='Aprovada'?'Aprovada':'Programada';
   $('fDireito').value=String(r?.direito||30);abonoSel=r?abonoOf(r):0;renderAbonoOpts();$('fObs').value=r?.obs||'';
-  $('mDelete').hidden=!r;disarm($('mDelete'));
+  baseHint('fBaseHint','');$('mDelete').hidden=!r;disarm($('mDelete'));
   $('overlay').hidden=false;updateSummary();setTimeout(()=>$('fNome').focus(),30);
 }
 function closeForm(){$('overlay').hidden=true;editingId=null}
@@ -796,6 +815,8 @@ async function exportCsv(){
 /* ---------- eventos ---------- */
 document.addEventListener('click',e=>{
   const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.base){baseAction(t.dataset.base,t);return}
+  if(t.dataset.close==='base'){closeBase();return}
   if(t.dataset.tab){tab=t.dataset.tab;try{localStorage.setItem('aba',tab);history.replaceState(null,'','#'+tab)}catch(err){}render();return}
   if(t.dataset.regime!=null){setRegime(+t.dataset.regime);return}
   if(t.dataset.bhtipo){bhTipo=t.dataset.bhtipo;renderBhTipos();bhSummary();return}
@@ -821,6 +842,9 @@ document.addEventListener('click',e=>{
     updateSummary();return}
   if(t.dataset.d){const a=parse($('fIni').value);if(isNaN(a)){toast('Escolha primeiro a data de início');$('fIni').focus();return}$('fFim').value=iso(a+(+t.dataset.d-1)*DAY);updateSummary();return}
 });
+$('btnBase').onclick=openBase;
+$('overlayBase').addEventListener('click',e=>{if(e.target===$('overlayBase'))closeBase()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('overlayBase').hidden)closeBase()});
 $('btnAdd').onclick=()=>tab==='bh'?openBH():openForm();
 $('btnExport').onclick=()=>tab==='bh'?exportBH():exportCsv();
 $('bClose').onclick=$('bCancel').onclick=()=>closeBH();
@@ -946,7 +970,7 @@ function openBH(id,preset){
   $('bTitle').textContent=r?'Editar lançamento':'Lançar horas';
   $('bNome').value=r?.nome||pre?.nome||'';$('bCargo').value=r?.cargo||pre?.cargo||'';$('bSetor').value=r?.setor||pre?.setor||'';
   $('bData').value=r?.data||iso(TODAY);$('bHoras').value=r?fmtH(r.minutos):'';$('bMotivo').value=r?.motivo||'';
-  bhTipo=r?.tipo||'credito';renderBhTipos();$('bDelete').hidden=!r;disarm($('bDelete'));
+  bhTipo=r?.tipo||'credito';renderBhTipos();baseHint('bBaseHint','');$('bDelete').hidden=!r;disarm($('bDelete'));
   $('overlayBH').hidden=false;bhSummary();setTimeout(()=>$(pre?'bHoras':'bNome').focus(),30);
 }
 function closeBH(){$('overlayBH').hidden=true;bhEditing=null}
@@ -1018,6 +1042,124 @@ async function exportBH(){
   if(!downloads){toast('Exportação indisponível nesta visualização');return}
   try{await downloads.save({filename:`banco_de_horas_${iso(TODAY)}.csv`,data:'﻿'+L.join('\r\n')})}catch(e){}
 }
+
+/* ---------- base de colaboradores ---------- */
+let base=[], baseMeta=null, baseKey='', baseImport=null;
+const BASE_FIELDS=[
+  ['nome','Nome *',['nome','nome completo','colaborador','funcionario','empregado','nome do colaborador','nome do funcionario','nome funcionario']],
+  ['matricula','Matrícula',['matricula','mat','re','registro','chapa','codigo','cod','id','cadastro']],
+  ['cargo','Cargo',['cargo','funcao','cargo atual','descricao do cargo','descricao cargo']],
+  ['area','Área / Setor',['area','setor','departamento','depto','lotacao','unidade','centro de custo','cc','filial','local']],
+  ['admissao','Admissão',['admissao','data admissao','data de admissao','dt admissao','dt. admissao']]
+];
+const baseByName=n=>{const k=norm(n);return k?base.filter(b=>norm(b.nome)===k):[]};
+const baseByMat=m=>{const k=norm(m);return k?base.filter(b=>norm(b.matricula)===k):[]};
+async function loadBase(){
+  const key=baseMeta?`${baseMeta.atualizadoEm}|${baseMeta.partes}`:'';
+  if(key===baseKey)return;baseKey=key;
+  if(!baseMeta||!baseMeta.partes){base=[];render();return}
+  try{
+    const parts=await Promise.all(Array.from({length:baseMeta.partes},(_,i)=>db.doc('config/colab_'+i).get()));
+    base=parts.flatMap(p=>p.exists?(p.data().itens||[]):[]).map(a=>({nome:String(a[0]||''),matricula:String(a[1]||''),cargo:String(a[2]||''),area:String(a[3]||''),admissao:String(a[4]||'')}));
+  }catch(e){baseKey='';toast('Não foi possível carregar a base de colaboradores.')}
+  render();
+}
+function chunkItems(items){const out=[];let cur=[],len=20;for(const it of items){const l=JSON.stringify(it).length+1;if(cur.length&&len+l>28000){out.push(cur);cur=[];len=20}cur.push(it);len+=l}if(cur.length)out.push(cur);return out}
+async function saveBase(items,arquivo){
+  const parts=chunkItems(items),oldN=baseMeta?.partes||0,meta={partes:parts.length,total:items.length,arquivo,atualizadoEm:new Date().toISOString()};
+  if(!db){base=items.map(a=>({nome:a[0],matricula:a[1],cargo:a[2],area:a[3],admissao:a[4]}));baseMeta=meta;baseKey=`${meta.atualizadoEm}|${meta.partes}`;render();return}
+  for(let i=0;i<parts.length;i++)await db.doc('config/colab_'+i).set({itens:parts[i]});
+  await db.doc('config/colabmeta').set(meta);
+  for(let i=parts.length;i<oldN;i++){try{await db.doc('config/colab_'+i).delete()}catch(e){}}
+}
+function cellStr(v){if(v instanceof Date&&!isNaN(v))return`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;return String(v??'').trim()}
+function toISOdate(s){s=String(s||'').trim();let m;if((m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s)))return`${m[1]}-${m[2]}-${m[3]}`;if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s))){const y=m[3].length===2?'20'+m[3]:m[3];return`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}return''}
+function sheetRows(wb,name){return XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:''}).map(r=>r.map(cellStr)).filter(r=>r.some(c=>c!==''))}
+function detectHeader(rows){for(let r=0;r<Math.min(rows.length,15);r++){if(rows[r].some(c=>BASE_FIELDS[0][2].includes(norm(c))))return r}return 0}
+function detectMap(hdr){const h=hdr.map(norm),map={},used=new Set();
+  for(const[k,,syn]of BASE_FIELDS){let i=h.findIndex((x,j)=>!used.has(j)&&syn.includes(x));if(i<0)i=h.findIndex((x,j)=>!used.has(j)&&syn.some(s=>s.length>3&&x.includes(s)));map[k]=i;if(i>=0)used.add(i)}
+  return map}
+function setImportSheet(name){const rows=sheetRows(baseImport.wb,name),hdr=detectHeader(rows);Object.assign(baseImport,{sheet:name,rows,hdr,map:detectMap(rows[hdr]||[])})}
+function importItems(){
+  const{rows,hdr,map}=baseImport,out=[],seen=new Set();let skip=0,dup=0;
+  for(let r=hdr+1;r<rows.length;r++){const row=rows[r],g=k=>map[k]>=0?String(row[map[k]]??'').trim():'';
+    const nome=g('nome');if(!nome){skip++;continue}
+    const mat=g('matricula'),key=mat?'m:'+norm(mat):'n:'+norm(nome);if(seen.has(key)){dup++;continue}seen.add(key);
+    out.push([nome,mat,g('cargo'),g('area'),toISOdate(g('admissao'))])}
+  return{items:out,skip,dup};
+}
+function openBase(){baseImport=null;renderBaseModal();$('overlayBase').hidden=false}
+function closeBase(){$('overlayBase').hidden=true;baseImport=null}
+function renderBaseModal(){
+  const el=$('baseBody');if(!el)return;
+  const has=baseMeta&&baseMeta.total>0;
+  const status=has?`<div class="summary"><span><span class="big">${nf(baseMeta.total)}</span> colaboradores na base</span><span>Arquivo <strong>${esc(baseMeta.arquivo||'—')}</strong></span><span>Atualizada em ${new Date(baseMeta.atualizadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div>`
+    :`<div class="summary"><span style="color:var(--muted)">Nenhuma base carregada. Suba uma planilha (.xlsx ou .csv) com nome, matrícula, cargo e área dos colaboradores.</span></div>`;
+  if(!baseImport){
+    el.innerHTML=`${status}
+      <p class="note">Ao lançar férias ou horas, o campo Colaborador passa a sugerir os nomes da base. Ao escolher um nome (ou digitar a matrícula), matrícula, cargo e área são preenchidos sozinhos. Uma nova planilha substitui a base atual; os lançamentos já feitos não mudam.</p>
+      ${canWrite?`<div class="actions"><button class="btn primary" type="button" data-base="upload">Subir planilha</button><button class="btn" type="button" data-base="template">Baixar modelo</button>${has?'<button class="btn danger" type="button" data-base="remove">Excluir</button>':''}</div>`:''}
+      ${has?`<div class="field"><label for="baseSearch">Consultar base</label><input type="search" id="baseSearch" placeholder="Nome ou matrícula…"></div><div class="preview scroll-x" id="baseList"></div>`:''}`;
+    if(has)renderBaseList('');
+    return;
+  }
+  const{items,skip,dup}=importItems(),hdrRow=baseImport.rows[baseImport.hdr]||[];
+  const opts=sel=>`<option value="-1">— não usar —</option>`+hdrRow.map((h,i)=>`<option value="${i}"${sel===i?' selected':''}>${esc(h||'Coluna '+(i+1))}</option>`).join('');
+  el.innerHTML=`<div class="summary"><span>Arquivo <strong>${esc(baseImport.name)}</strong></span>${baseImport.wb.SheetNames.length>1?`<label class="check">Aba <select id="baseSheet">${baseImport.wb.SheetNames.map(n=>`<option${n===baseImport.sheet?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}<span>Cabeçalho na linha ${baseImport.hdr+1}</span></div>
+    <div><div class="eyebrow" style="margin-bottom:8px">Qual coluna corresponde a cada campo?</div>
+    <div class="map-grid">${BASE_FIELDS.map(([k,l])=>`<div class="field"><label for="map_${k}">${l}</label><select id="map_${k}" data-map="${k}">${opts(baseImport.map[k])}</select></div>`).join('')}</div></div>
+    ${baseImport.map.nome<0?'<div class="msg err">Escolha a coluna com o nome do colaborador.</div>':''}
+    <div class="preview scroll-x"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Área / Setor</th><th>Admissão</th></tr></thead><tbody>${items.slice(0,6).map(a=>`<tr><td>${esc(a[0])}</td><td class="num" style="text-align:left">${esc(a[1])}</td><td>${esc(a[2])}</td><td>${esc(a[3])}</td><td class="num" style="text-align:left">${a[4]?fmt(a[4]):''}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">${nf(items.length)} colaboradores prontos para importar${skip?` · ${skip} linha${skip===1?'':'s'} sem nome ignorada${skip===1?'':'s'}`:''}${dup?` · ${dup} repetido${dup===1?'':'s'} ignorado${dup===1?'':'s'}`:''}${items.length>6?' · mostrando os 6 primeiros':''}.</p>
+    <div class="actions"><button class="btn" type="button" data-base="cancel">Cancelar</button><button class="btn primary" type="button" data-base="import"${items.length&&baseImport.map.nome>=0?'':' disabled'}>Importar ${nf(items.length)} colaboradores${has?' (substitui a base atual)':''}</button></div>`;
+}
+function renderBaseList(q){
+  const k=norm(q),list=(k?base.filter(b=>norm(b.nome).includes(k)||norm(b.matricula).includes(k)):base).slice(0,50);
+  const el=$('baseList');if(!el)return;
+  el.innerHTML=`<table><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Área / Setor</th></tr></thead><tbody>${list.map(b=>`<tr><td>${esc(b.nome)}</td><td class="num" style="text-align:left">${esc(b.matricula)}</td><td>${b.cargo?`<span class="cargo-tag" style="--c:${cvar(b.cargo)}"><span class="dot"></span>${esc(b.cargo)}</span>`:''}</td><td>${esc(b.area)}</td></tr>`).join('')}</tbody></table>${list.length===50?'<p class="note" style="padding:8px 0 0">Mostrando 50 resultados. Refine a busca.</p>':''}`;
+}
+async function baseAction(a,btn){
+  if(a==='upload'){$('baseFile').value='';$('baseFile').click();return}
+  if(a==='template'){
+    const csv='﻿Nome;Matrícula;Cargo;Área / Setor;Admissão\r\nMaria da Silva;001234;Motorista;Operação Barueri;01/03/2024\r\n';
+    if(!downloads){toast('Download indisponível nesta visualização');return}
+    try{await downloads.save({filename:'modelo_base_colaboradores.csv',data:csv})}catch(e){}return}
+  if(a==='cancel'){baseImport=null;renderBaseModal();return}
+  if(a==='remove'){if(!btn.dataset.armed){arm(btn);return}btn.disabled=true;try{await saveBase([],'');toast('Base de colaboradores excluída');renderBaseModal()}catch(e){toast('Não foi possível excluir a base.')}return}
+  if(a==='import'){
+    const{items}=importItems();if(!items.length)return;btn.disabled=true;btn.textContent='Importando…';
+    try{await saveBase(items,baseImport.name);toast(`Base atualizada: ${nf(items.length)} colaboradores`);baseImport=null;renderBaseModal()}
+    catch(e){btn.disabled=false;btn.textContent='Tentar de novo';toast(e&&e.code==='quota_exceeded'?'Base grande demais para o armazenamento.':'Não foi possível salvar a base.')}
+  }
+}
+$('baseFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    if(typeof XLSX==='undefined')throw new Error('O leitor de planilhas não carregou. Recarregue a página.');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true,codepage:65001});
+    baseImport={name:f.name,wb};setImportSheet(wb.SheetNames[0]);renderBaseModal();
+  }catch(err){toast(err.message||'Não foi possível ler a planilha.')}
+});
+$('baseBody').addEventListener('change',e=>{
+  if(e.target.id==='baseSheet'){setImportSheet(e.target.value);renderBaseModal();return}
+  if(e.target.dataset.map){baseImport.map[e.target.dataset.map]=+e.target.value;renderBaseModal()}
+});
+$('baseBody').addEventListener('input',e=>{if(e.target.id==='baseSearch')renderBaseList(e.target.value)});
+/* preenchimento automático nos formulários */
+function baseHint(id,msg,cls){const h=$(id);if(h){h.textContent=msg||'';h.className='hint-line'+(cls?' '+cls:'')}}
+function applyBase(b,f){
+  if(f==='f'){$('fNome').value=b.nome;$('fMatricula').value=b.matricula;if(b.cargo)$('fCargo').value=b.cargo;if(b.area)$('fSetorIn').value=b.area;baseHint('fBaseHint',`Da base: ${[b.matricula&&'Mat. '+b.matricula,b.cargo,b.area].filter(Boolean).join(' · ')}`,'ok');updateSummary()}
+  else{$('bNome').value=b.nome;if(b.cargo)$('bCargo').value=b.cargo;if(b.area)$('bSetor').value=b.area;baseHint('bBaseHint',`Da base: ${[b.matricula&&'Mat. '+b.matricula,b.cargo,b.area].filter(Boolean).join(' · ')}`,'ok');bhSummary()}
+}
+function onNameInput(f){
+  if(!base.length)return;const v=$(f==='f'?'fNome':'bNome').value,m=baseByName(v),hid=f==='f'?'fBaseHint':'bBaseHint';
+  if(m.length===1)applyBase(m[0],f);
+  else if(m.length>1)baseHint(hid,`Há ${m.length} colaboradores com este nome na base.${f==='f'?' Digite a matrícula para escolher.':''}`,'warn');
+  else baseHint(hid,v.trim()?'Nome fora da base de colaboradores.':'',v.trim()?'muted':'');
+}
+$('fNome').addEventListener('input',()=>onNameInput('f'));
+$('bNome').addEventListener('input',()=>onNameInput('b'));
+$('fMatricula').addEventListener('change',()=>{const m=baseByMat($('fMatricula').value);if(m.length===1)applyBase(m[0],'f');else if($('fMatricula').value.trim()&&base.length)baseHint('fBaseHint','Matrícula não encontrada na base.','warn')});
 
 /* ---------- dados: SharePoint (Microsoft Graph) ---------- */
 /* Igual ao Squad e à Gestão de Demandas: sem depender da TI. No GitHub Pages o login abre uma janela (popup)
@@ -1131,7 +1273,9 @@ const spDb={
   }},
   doc(path){const id=path.split("/")[1];return{
     onSnapshot(next){const f=()=>next(cfgSnap(id));SP.listeners.push(f);f();return()=>{}},
-    set(d){return spUpsert("config",id,{valor:JSON.stringify(d)})}
+    set(d){return spUpsert("config",id,{valor:JSON.stringify(d)})},
+    get(){return Promise.resolve(cfgSnap(id))},
+    delete(){return spDelete("config",id)}
   }}
 };
 downloads={save({filename,data}){const blob=new Blob([data],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);return Promise.resolve()}};
@@ -1148,6 +1292,7 @@ async function afterLogin(){
     db.doc("config/cargos").onSnapshot(s=>{cargoMap=(s.exists&&s.data().map)||{};render()});
     db.collection("bh").onSnapshot(s=>{bhRows=s.docs.map(x=>({id:x.id,...x.data()}));render()});
     db.doc("config/bh").onSnapshot(s=>{bhCfg={prazo:6,...(s.exists?s.data():{})};render()});
+    db.doc("config/colabmeta").onSnapshot(s=>{baseMeta=s.exists?s.data():null;loadBase();if(!$("overlayBase").hidden&&!baseImport)renderBaseModal()});
     await spRefresh();
     $("loginGate").hidden=true;$("appRoot").hidden=false;
     $("userName").textContent=userName();
